@@ -3,7 +3,16 @@ services:
     build:
       context: .
     image: wuodan/watchpuppy:latest
-    container_name: watchpuppy
+    container_name: watchpuppy-alpine
+    environment:
+      LOG_LEVEL: DEBUG
+    volumes:
+      - ./input/:/data/input:ro
+  watchpuppy-debian:
+    build:
+      context: .
+    image: wuodan/watchpuppy:debian
+    container_name: watchpuppy-debian
     environment:
       LOG_LEVEL: DEBUG
     volumes:
