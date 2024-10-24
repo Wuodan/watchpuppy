@@ -1,76 +1,72 @@
-#!/usr/bin/env python3
+#!/usr/bin/env bash
 
-import time
-import os
-import sys
-import logging
-from watchdog.observers.polling import PollingObserver as Observer
-from watchdog.events import FileSystemEventHandler
+set -e
 
-# Logging setup
-logger = logging.getLogger(os.path.basename(__file__))
-logger.setLevel(logging.DEBUG)
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+SCRIPT_NAME=$(basename "$0")
 
-log_level = os.getenv("LOG_LEVEL", "INFO").upper()
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(log_level)
-console_handler.setFormatter(logging.Formatter('%(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(console_handler)
+# Set default log level to INFO if LOG_LEVEL is not set
+LOG_LEVEL=${LOG_LEVEL:-INFO}
 
+# Log according to LOG_LEVEL
+log() {
+    local LEVEL=$1
+    local MESSAGE=$2
 
-# Process file when created or modified
-class FileHandler(FileSystemEventHandler):
-	def __init__(self, process_script):
-		self.process_script = process_script
+    # Log level precedence mapping
+    declare -A LEVELS=( ["DEBUG"]=10 ["INFO"]=20 ["WARNING"]=30 ["ERROR"]=40 ["CRITICAL"]=50 )
 
-	def on_created(self, event):
-		if not event.is_directory:
-			try:
-				logger.info(f"New file detected: {event.src_path}")
-				self.process_file(event.src_path)
-			except Exception as e:
-				logger.error(f"Error processing file {event.src_path}: {e}")
+    if [ "${LEVELS[$LEVEL]}" -ge "${LEVELS[$LOG_LEVEL]}" ]; then
+        echo "$SCRIPT_NAME - $LEVEL - $MESSAGE"
+    fi
+}
 
-	def on_modified(self, event):
-		if not event.is_directory:
-			try:
-				logger.info(f"File modified: {event.src_path}")
-				self.process_file(event.src_path)
-			except Exception as e:
-				logger.error(f"Error processing file {event.src_path}: {e}")
+monitor() {
+    local LEVEL=$1
+    local MESSAGE=$2
+    log "INFO" "Starting file watcher on directory: $WATCH_DIR"
+    log "INFO" "Process script: $PROCESS_SCRIPT"
 
-	def process_file(self, filepath):
-		try:
-			logger.info(f"Running process script on: {filepath}")
-			exit_code = os.system(f"{self.process_script} {filepath}")
-			if exit_code != 0:
-				raise Exception(f"Process script returned non-zero exit code: {exit_code}")
-		except Exception as e:
-			logger.error(f"Failed to process {filepath}: {e}")
+    # Monitor the directory for new files and react to close_write events
+    inotifywait -m -r -e close_write --format '%w%f' "$WATCH_DIR" | while read -r NEWFILE
+    do
+        log "INFO" "New file detected: $NEWFILE"
 
+        # Run the process script
+        if ! "$PROCESS_SCRIPT" "$NEWFILE"; then
+            log "ERROR" "Error executing $PROCESS_SCRIPT with $NEWFILE"
+        else
+            log "INFO" "Successfully processed $NEWFILE with $PROCESS_SCRIPT"
+        fi
+    done
+}
 
-def monitor_directory(watch_dir, process_script):
-	event_handler = FileHandler(process_script)
-	observer = Observer()
-	observer.schedule(event_handler, watch_dir, recursive=True)
+# Check if the filesystem type supports inotify
+check_inotify_support() {
+  localh fs_type=$(stat -f -c %T "$WATCH_DIR")
 
-	logger.info(f"Starting file watcher on directory: {watch_dir}")
-	logger.info(f"Process script: {process_script}")
+  # These file systems do not support inotify
+  if [[ "$FS_TYPE" == "v9fs" || "$FS_TYPE" == "fuseblk" || "$FS_TYPE" == "nfs" || "$FS_TYPE" == "cifs" || "$FS_TYPE" == "smbfs" || "$FS_TYPE" == "overlayfs" ]]; then
+      log "DEBUG" "File system $FS_TYPE does not support inotify. Switching to Python polling."
+      return 1
+  else
+      log "DEBUG" "File system $FS_TYPE supports inotify. Using inotifywait."
+      return
+  fi
+}
 
-	observer.start()
+# Check if exactly two arguments are provided
+if [ $# -ne 2 ]; then
+    log "ERROR" "Usage: $0 /path/to/directory /path/to/process-script"
+    exit 1
+fi
 
-	try:
-		while True:
-			time.sleep(1)
-	except KeyboardInterrupt:
-		observer.stop()
+WATCH_DIR="$1"
+PROCESS_SCRIPT="$2"
 
-	observer.join()
-
-
-if __name__ == "__main__":
-	if len(sys.argv) != 3:
-		logger.error("Usage: python watch-puppy.py /path/to/directory /path/to/process-script")
-		sys.exit(1)
-
-	monitor_directory(watch_dir=sys.argv[1], process_script=sys.argv[2])
+if check_inotify_support; then
+    monitor
+else
+    # with exec the python process replaces the shell process as main process.
+    exec python3 /path/to/watchpuppy.py "$WATCH_DIR" "$PROCESS_SCRIPT"
+fi

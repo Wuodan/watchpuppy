@@ -39,11 +39,11 @@ RUN --mount=type=cache,target=/home/appuser/.cache/pip \
 
 # Copy scripts late to avoid rebuilds
 USER root
-COPY watchpuppy.sh watchpuppy /app/
+COPY watchpuppy watchpuppy.py /app/
 
 WORKDIR /data
 
 # Use non-priviledged user to run app
 USER appuser
 
-CMD ["/app/watchpuppy.sh", "/data/input", "echo"]
+CMD ["/app/watchpuppy", "/data/input", "echo"]
