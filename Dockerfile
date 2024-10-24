@@ -10,7 +10,7 @@ ENV LOG_LEVEL=DEBUG
 RUN \
     if command -v apk > /dev/null 2>&1; then \
         # For Alpine
-        apk add --no-cache inotify-tools \
+        apk add --no-cache inotify-tools; \
     elif command -v apt-get > /dev/null 2>&1; then \
         # For Debian
         apt-get update && \
@@ -19,7 +19,7 @@ RUN \
         rm -rf /var/lib/apt/lists/*; \
     else \
         echo "Unsupported package manager. Exiting." && \
-        exit 1 \
+        exit 1; \
     fi
 
 # Create a non-privileged user that the app will run under.
@@ -39,7 +39,7 @@ WORKDIR /app
 # Create a virtual environment
 RUN python3 -m venv venv
 # Ensure the virtual environment is used for all future commands
-ENV PATH="$(pwd)/venv/bin:$PATH"
+ENV PATH="/app/venv/bin:$PATH"
 
 # Leverage a bind mount to requirements.txt to avoid having to copy them into
 # into this layer.
@@ -50,15 +50,15 @@ RUN --mount=type=bind,source=requirements.txt,target=requirements.txt,readonly \
 
 USER root
 
-# Copy scripts late to avoid rebuilds
-COPY watchpuppy watchpuppy.py /app/
+# Copy scripts late to avoid rebuiRlds
+COPY watchpuppy watchpuppy.py /app/bin/
 
 # Add watchpuppy to the PATH environment variable
-ENV PATH="/app/watchpuppy:${PATH}"
+ENV PATH="/app/bin:${PATH}"
 
 WORKDIR /data
 
 # Use non-priviledged user to run app
 USER appuser
 
-CMD ["/app/watchpuppy"]
+CMD ["watchpuppy"]

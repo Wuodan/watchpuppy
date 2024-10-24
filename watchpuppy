@@ -34,6 +34,7 @@ log() {
   fi
 }
 
+# todo watch modified as in python
 monitor_directory() {
     inotifywait -m -r -e close_write --format '%w%f' "$WATCH_DIR" | while read -r NEWFILE; do
         log "INFO" "New file detected: $NEWFILE"

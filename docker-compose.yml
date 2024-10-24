@@ -21,25 +21,25 @@ services:
       LOG_LEVEL: DEBUG
     volumes:
       - ./input/:/data/input:ro
-#  watchpuppy-demo:
-#    build:
-#      context: .
-#    image: wuodan/watchpuppy:latest
-#    container_name: watchpuppy-demo
-#    volumes:
-#      - ./input/:/data/input
-#    depends_on:
-#      - watchpuppy
-#      - watchpuppy-debian
-#    command:
-#      - "sh"
-#      - "-c"
-#      - |
-#        echo "pwd=$(pwd)" && \
-#        ls -alh && \
-#        watchpuppy /data/input echo && \
-#        touch /data/input/shared-folder-file && \
-#        mkdir /home/appuser/demo-dir && \
-#        watchpuppy /home/appuser/demo-dir echo && \
-#        touch /home/appuser/demo-dir/'inotify-capable file  insert.txt' && \
-#        echo 'Done'
+  watchpuppy-demo:
+    build:
+      context: .
+    image: wuodan/watchpuppy:latest
+    container_name: watchpuppy-demo
+    volumes:
+      - ./input/:/data/input
+    depends_on:
+      - watchpuppy
+      - watchpuppy-debian
+    command:
+      - "sh"
+      - "-c"
+      - |
+        echo "pwd=$(pwd)" && \
+        ls -alh && \
+        watchpuppy /data/input echo && \
+        touch /data/input/shared-folder-file && \
+        mkdir /home/appuser/demo-dir && \
+        watchpuppy /home/appuser/demo-dir echo && \
+        touch /home/appuser/demo-dir/'inotify-capable file  insert.txt' && \
+        echo 'Done'
