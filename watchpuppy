@@ -2,6 +2,7 @@
 
 set -e
 
+SCRIPT_DIR=$(dirname "$0")
 SCRIPT_NAME="watchpuppy.sh"
 LOG_LEVEL=${LOG_LEVEL:-"INFO"}
 
@@ -66,5 +67,5 @@ if check_inotify_support; then
     monitor_directory
 else
     log "INFO" "Switching to Python polling."
-    exec python3 ./watchpuppy.py "$WATCH_DIR" "$PROCESS_SCRIPT"
+    exec python3 "$SCRIPT_DIR"/watchpuppy.py "$WATCH_DIR" "$PROCESS_SCRIPT"
 fi

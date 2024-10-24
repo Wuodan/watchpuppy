@@ -23,7 +23,7 @@ services:
     build:
       context: .
     image: wuodan/watchpuppy:latest
-    container_name: watchpuppy-alpine
+    container_name: watchpuppy-demo
     volumes:
       - ./input/:/data/input
     command:
