@@ -3,7 +3,7 @@
 set -e
 
 SCRIPT_DIR=$(dirname "$0")
-SCRIPT_NAME="watchpuppy.sh"
+SCRIPT_NAME="watchpuppy"
 LOG_LEVEL=${LOG_LEVEL:-"INFO"}
 
 log() {
@@ -38,6 +38,7 @@ log() {
 monitor_directory() {
     inotifywait -m -r -e close_write --format '%w%f' "$WATCH_DIR" | while read -r NEWFILE; do
         log "INFO" "New file detected: $NEWFILE"
+        log "DEBUG" "Running process script: ['$PROCESS_SCRIPT' '$NEWFILE']"
         "$PROCESS_SCRIPT" "$NEWFILE"
     done
 }
@@ -64,9 +65,9 @@ WATCH_DIR="$1"
 PROCESS_SCRIPT="$2"
 
 if check_inotify_support; then
-    log "INFO" "Using inotifywait."
+    log "DEBUG" "Using inotifywait."
     monitor_directory
 else
-    log "INFO" "Switching to Python polling."
+    log "DEBUG" "File system of '"$WATCH_DIR"' does not support inotifywait. Switching to Python polling."
     exec python3 "$SCRIPT_DIR"/watchpuppy.py "$WATCH_DIR" "$PROCESS_SCRIPT"
 fi

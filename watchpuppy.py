@@ -41,7 +41,7 @@ class FileHandler(FileSystemEventHandler):
 
 	def process_file(self, filepath):
 		try:
-			logger.info("Running process script: ['%s' '%s']", self.process_script, filepath)
+			logger.debug("Running process script: ['%s' '%s']", self.process_script, filepath)
 			exit_code = os.system(f"{self.process_script} {filepath}")
 			if exit_code != 0:
 				raise Exception(f"Process script ['{self.process_script}' '{filepath}'] returned non-zero exit code: {exit_code}")

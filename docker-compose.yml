@@ -35,13 +35,13 @@ services:
       - "sh"
       - "-c"
       - |
-        echo "pwd=$(pwd)" && \
-        ls -alh && \
+        rm -f /data/input/shared-folder-file && \
         watchpuppy /data/input echo & \
+        sleep 2 && \
         touch /data/input/shared-folder-file && \
         mkdir /home/appuser/demo-dir && \
         watchpuppy /home/appuser/demo-dir echo & \
-        echo "sleeping 1 second" && \
-        sleep 1 && \
+        # 3 seconds is usually enough
+        sleep 5 && \
         touch '/home/appuser/demo-dir/inotify-capable file  insert.txt' && \
         echo 'Done'
