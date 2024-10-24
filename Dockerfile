@@ -39,7 +39,7 @@ RUN --mount=type=cache,target=/home/appuser/.cache/pip \
 
 # Copy scripts late to avoid rebuilds
 USER root
-COPY watchdog.sh watchdog /app/
+COPY watchpuppy.sh watchpuppy /app/
 
 WORKDIR /data
 
