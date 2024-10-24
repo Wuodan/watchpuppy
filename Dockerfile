@@ -25,15 +25,12 @@ RUN python3 -m venv venv
 # Ensure the virtual environment is used for all future commands
 ENV PATH="$(pwd)/venv/bin:$PATH"
 
-# Download dependencies as a separate step to take advantage of Docker's caching.
-# Leverage a cache mount to /home/appuser/pip to speed up subsequent builds.
 # Leverage a bind mount to requirements.txt to avoid having to copy them into
 # into this layer.
-RUN --mount=type=cache,target=/home/appuser/.cache/pip \
-    --mount=type=bind,source=requirements.txt,target=requirements.txt,readonly \
+RUN --mount=type=bind,source=requirements.txt,target=requirements.txt,readonly \
     python3 -m pip install --upgrade pip \
     && python3 -m pip install -r requirements.txt \
-    && rm -rf /tmp/* \
+    && rm -rf /tmp/* /home/appuser/.cache/pip
 
 USER root
 
