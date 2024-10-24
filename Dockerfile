@@ -1,12 +1,10 @@
-FROM python:3-slim-bookworm
+FROM python:3-alpine
 
 # For logging
 ENV LOG_LEVEL=DEBUG
 
-# install inotify-tools
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends inotify-tools && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install inotify-tools
+RUN apk add --no-cache inotify-tools
 
 # Create a non-privileged user that the app will run under.
 ARG UID=10001
