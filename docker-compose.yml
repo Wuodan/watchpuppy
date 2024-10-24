@@ -12,6 +12,8 @@ services:
   watchpuppy-debian:
     build:
       context: .
+      args:
+        BASE_IMAGE: python:3-slim-bookworm
     image: wuodan/watchpuppy:debian
     container_name: watchpuppy-debian
     command: ["watchpuppy", "/data/input", "echo"]

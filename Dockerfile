@@ -1,10 +1,26 @@
-FROM python:3-alpine
+# Base image argument
+ARG BASE_IMAGE=python:3-alpine
+
+FROM ${BASE_IMAGE}
 
 # For logging
 ENV LOG_LEVEL=DEBUG
 
 # Install inotify-tools
-RUN apk add --no-cache inotify-tools
+RUN \
+    if command -v apk > /dev/null 2>&1; then \
+        # For Alpine
+        apk add --no-cache inotify-tools \
+    elif command -v apt-get > /dev/null 2>&1; then \
+        # For Debian
+        apt-get update && \
+        apt-get install -y --no-install-recommends inotify-tools && \
+        apt-get clean && \
+        rm -rf /var/lib/apt/lists/*; \
+    else \
+        echo "Unsupported package manager. Exiting." && \
+        exit 1 \
+    fi
 
 # Create a non-privileged user that the app will run under.
 ARG UID=10001
