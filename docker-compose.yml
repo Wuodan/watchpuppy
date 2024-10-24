@@ -1,0 +1,11 @@
+services:
+  watchpuppy:
+    build:
+      context: .
+    image: wuodan/watchpuppy
+    container_name: watchpuppy
+    environment:
+      LOG_LEVEL: INFO
+    volumes:
+      - ./input/:/data/input:ro
+    shm_size: "2gb"
