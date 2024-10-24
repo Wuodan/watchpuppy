@@ -4,7 +4,6 @@ set -e
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 SCRIPT_NAME=$(basename "$0")
-
 # Set default log level to INFO if LOG_LEVEL is not set
 LOG_LEVEL=${LOG_LEVEL:-INFO}
 
@@ -12,10 +11,8 @@ LOG_LEVEL=${LOG_LEVEL:-INFO}
 log() {
     local level=$1
     local message=$2
-
     # Log level precedence mapping
     declare -A levels=( ["DEBUG"]=10 ["INFO"]=20 ["WARNING"]=30 ["ERROR"]=40 ["CRITICAL"]=50 )
-
     if [ "${levels[$level]}" -ge "${levels[$LOG_LEVEL]}" ]; then
         echo "$SCRIPT_NAME - $level - $message"
     fi
@@ -29,7 +26,6 @@ monitor() {
     inotifywait -m -r -e close_write --format '%w%f' "$WATCH_DIR" | while read -r new_file
     do
         log "INFO" "New file detected: $new_file"
-
         # Run the process script
         if ! "$PROCESS_SCRIPT" "$new_file"; then
             log "ERROR" "Error executing $PROCESS_SCRIPT with $new_file"
@@ -41,17 +37,14 @@ monitor() {
 
 # Check if the filesystem type supports inotify
 check_inotify_support() {
-  local fs_type=
-  fs_type="$(stat -f -c %T "$WATCH_DIR")"
-
-  # These file systems do not support inotify
-  if [[ "$fs_type" == "v9fs" || "$fs_type" == "fuseblk" || "$fs_type" == "nfs" || "$fs_type" == "cifs" || "$fs_type" == "smbfs" ]]; then
-      log "DEBUG" "File system $fs_type does not support inotify. Switching to Python polling."
-      return 1
-  else
-      log "DEBUG" "File system $fs_type supports inotify. Using inotifywait."
-      return
-  fi
+    local fs_type=
+    fs_type="$(stat -f -c %T "$WATCH_DIR")"
+    # These file systems do not support inotify
+    if [[ "$fs_type" == "v9fs" || "$fs_type" == "fuseblk" || "$fs_type" == "nfs" || "$fs_type" == "cifs" || "$fs_type" == "smbfs" ]]; then
+        return 1
+    else
+        return
+    fi
 }
 
 # Check if exactly two arguments are provided
@@ -64,8 +57,10 @@ WATCH_DIR="$1"
 PROCESS_SCRIPT="$2"
 
 if check_inotify_support; then
+    log "DEBUG" "File system $fs_type supports inotify. Using inotifywait."
     monitor
 else
+    log "INFO" "File system $fs_type does not support inotify. Switching to Python polling."
     # with exec the python process replaces the shell process as main process.
     exec python3 "$SCRIPT_DIR/watchpuppy.py" "$WATCH_DIR" "$PROCESS_SCRIPT"
 fi
