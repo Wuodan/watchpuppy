@@ -1,0 +1,10 @@
+services:
+  watchpuppy:
+    build:
+      context: .
+    image: wuodan/watchpuppy:latest
+    container_name: watchpuppy
+    environment:
+      LOG_LEVEL: DEBUG
+    volumes:
+      - ./input/:/data/input:ro
