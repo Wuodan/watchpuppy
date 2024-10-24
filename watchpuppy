@@ -40,13 +40,31 @@ monitor_directory() {
     done
 }
 
-# Read file system type
-FS_TYPE=$(stat -f -c %T "$WATCH_DIR")
+# Check if the filesystem type supports inotify
+check_inotify_support() {
+    # Read file system type
+    FS_TYPE=$(stat -f -c %T "$WATCH_DIR")
+    # These file systems do not support inotify
+    if [ "$FS_TYPE" = "v9fs" ] || [ "$FS_TYPE" = "fuseblk" ] || [ "$FS_TYPE" = "nfs" ] || [ "$FS_TYPE" = "cifs" ] || [ "$FS_TYPE" = "smbfs" ]; then
+        return 1
+    else
+        return
+    fi
+}
 
-if [ "$FS_TYPE" = "v9fs" ] || [ "$FS_TYPE" = "fuseblk" ] || [ "$FS_TYPE" = "nfs" ] || [ "$FS_TYPE" = "cifs" ] || [ "$FS_TYPE" = "smbfs" ]; then
-    log "INFO" "Switching to Python polling."
-    exec python3 /path/to/watchpuppy.py "$WATCH_DIR" "$PROCESS_SCRIPT"
-else
+# Check if exactly two arguments are provided
+if [ $# -ne 2 ]; then
+    log "ERROR" "Usage: $0 /path/to/directory /path/to/process-script"
+    exit 1
+fi
+
+WATCH_DIR="$1"
+PROCESS_SCRIPT="$2"
+
+if check_inotify_support; then
     log "INFO" "Using inotifywait."
     monitor_directory
+else
+    log "INFO" "Switching to Python polling."
+    exec python3 /path/to/watchpuppy.py "$WATCH_DIR" "$PROCESS_SCRIPT"
 fi
