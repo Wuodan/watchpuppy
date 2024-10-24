@@ -4,6 +4,7 @@ services:
       context: .
     image: wuodan/watchpuppy:latest
     container_name: watchpuppy-alpine
+    command: ["watchpuppy", "/data/input", "echo"]
     environment:
       LOG_LEVEL: DEBUG
     volumes:
@@ -13,7 +14,24 @@ services:
       context: .
     image: wuodan/watchpuppy:debian
     container_name: watchpuppy-debian
+    command: ["watchpuppy", "/data/input", "echo"]
     environment:
       LOG_LEVEL: DEBUG
     volumes:
       - ./input/:/data/input:ro
+  watchpuppy-demo:
+    build:
+      context: .
+    image: wuodan/watchpuppy:latest
+    container_name: watchpuppy-alpine
+    volumes:
+      - ./input/:/data/input
+    command:
+      - "sh"
+      - "-c"
+      - |
+        watchpuppy /data/input echo && \
+        touch /data/input/shared-
+        mkdir /home/appuser/demo-dir \
+        watchpuppy /home/appuser/demo-dir echo && \
+        echo 'Done'
