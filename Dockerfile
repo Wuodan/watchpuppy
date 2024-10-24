@@ -33,11 +33,15 @@ RUN --mount=type=cache,target=/home/appuser/.cache/pip \
     --mount=type=bind,source=requirements.txt,target=requirements.txt,readonly \
     python3 -m pip install --upgrade pip \
     && python3 -m pip install -r requirements.txt \
-    && rm -rf /tmp/*
+    && rm -rf /tmp/* \
+
+USER root
 
 # Copy scripts late to avoid rebuilds
-USER root
 COPY watchpuppy watchpuppy.py /app/
+
+# Add watchpuppy to the PATH environment variable
+ENV PATH="/app/watchpuppy:${PATH}"
 
 WORKDIR /data
 
