@@ -23,30 +23,30 @@ class FileHandler(FileSystemEventHandler):
 	def __init__(self, process_script):
 		self.process_script = process_script
 
-	def on_created(self, event):
+	def on_created(self, event) -> None:
 		if not event.is_directory:
 			try:
-				logger.info(f"New file detected: {event.src_path}")
+				logger.info("New file detected: %s", event.src_path)
 				self.process_file(event.src_path)
 			except Exception as e:
-				logger.error(f"Error processing file {event.src_path}: {e}")
+				logger.error("Error processing file %s: %s", event.src_path, e)
 
 	def on_modified(self, event):
 		if not event.is_directory:
 			try:
-				logger.info(f"File modified: {event.src_path}")
+				logger.info("File modified: %s", event.src_path)
 				self.process_file(event.src_path)
 			except Exception as e:
-				logger.error(f"Error processing file {event.src_path}: {e}")
+				logger.error("Error processing file %s: %s", event.src_path, e)
 
 	def process_file(self, filepath):
 		try:
-			logger.info(f"Running process script on: {filepath}")
+			logger.debug("Running process script: ['%s' '%s']", self.process_script, filepath)
 			exit_code = os.system(f"{self.process_script} {filepath}")
 			if exit_code != 0:
-				raise Exception(f"Process script returned non-zero exit code: {exit_code}")
+				raise Exception(f"Process script ['{self.process_script}' '{filepath}'] returned non-zero exit code: {exit_code}")
 		except Exception as e:
-			logger.error(f"Failed to process {filepath}: {e}")
+			logger.error("Failed to process %s: %s", filepath, e)
 
 
 def monitor_directory(watch_dir, process_script):
@@ -54,8 +54,7 @@ def monitor_directory(watch_dir, process_script):
 	observer = Observer()
 	observer.schedule(event_handler, watch_dir, recursive=True)
 
-	logger.info(f"Starting file watcher on directory: {watch_dir}")
-	logger.info(f"Process script: {process_script}")
+	logger.info("Starting file watcher on directory %s with process script %s", watch_dir, process_script)
 
 	observer.start()
 

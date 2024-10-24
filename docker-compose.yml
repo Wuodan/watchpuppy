@@ -4,6 +4,7 @@ services:
       context: .
     image: wuodan/watchpuppy:latest
     container_name: watchpuppy-alpine
+    command: ["watchpuppy", "/data/input", "echo"]
     environment:
       LOG_LEVEL: DEBUG
     volumes:
@@ -11,9 +12,46 @@ services:
   watchpuppy-debian:
     build:
       context: .
+      args:
+        BASE_IMAGE: python:3-slim-bookworm
     image: wuodan/watchpuppy:debian
     container_name: watchpuppy-debian
+    command: ["watchpuppy", "/data/input", "echo"]
     environment:
-      LOG_LEVEL: DEBUG
+      LOG_LEVEL: INFO
     volumes:
       - ./input/:/data/input:ro
+  watchpuppy-demo:
+    build:
+      context: .
+    image: wuodan/watchpuppy:latest
+    container_name: watchpuppy-demo
+    environment:
+      LOG_LEVEL: WARN
+    volumes:
+      - ./input/:/data/input
+    depends_on:
+      - watchpuppy
+      - watchpuppy-debian
+    command:
+      - "sh"
+      - "-c"
+      - |
+        set -e
+        # clean up last run
+        rm -f /data/input/shared-folder-file
+        mkdir -p /home/appuser/demo-dir
+        
+        watchpuppy /data/input echo &
+        watchpuppy /home/appuser/demo-dir echo &
+        
+        # 5 seconds is usually enough
+        sleep 5
+        
+        echo "Write file 'shared-folder-file.txt' to shared folder: /data/input"
+        touch /data/input/shared-folder-file.txt
+        
+        echo "Write file 'file in inotify capable destination.txt' to normal dir /home/appuser/demo-dir"
+        touch '/home/appuser/demo-dir/file in inotify capable destination.txt'
+        
+        tail -f /dev/null

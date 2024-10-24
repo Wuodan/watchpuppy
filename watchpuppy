@@ -2,53 +2,59 @@
 
 set -e
 
-SCRIPT_NAME="watchpuppy.sh"
+SCRIPT_DIR=$(dirname "$0")
+SCRIPT_NAME="watchpuppy"
 LOG_LEVEL=${LOG_LEVEL:-"INFO"}
+
+# Function to map log level names to numeric values
+get_log_level_num() {
+  case "$1" in
+    "DEBUG") echo 10 ;;
+    "INFO") echo 20 ;;
+    "WARNING"|"WARN") echo 30 ;;
+    "ERROR") echo 40 ;;
+    "CRITICAL") echo 50 ;;
+    *) echo 100 ;;  # Default to 100 for unknown levels
+  esac
+}
+
+# Set the log level number only once
+LOG_LEVEL_NUM=$(get_log_level_num "$LOG_LEVEL")
 
 log() {
   LEVEL=$1
   MESSAGE=$2
 
-  # No associative arrays in sh, use case structure instead
-  case "$LEVEL" in
-    "DEBUG") LEVEL_NUM=10 ;;
-    "INFO") LEVEL_NUM=20 ;;
-    "WARNING") LEVEL_NUM=30 ;;
-    "ERROR") LEVEL_NUM=40 ;;
-    "CRITICAL") LEVEL_NUM=50 ;;
-    *) LEVEL_NUM=0 ;;
-  esac
+  # Get numeric value for the current log level
+  LEVEL_NUM=$(get_log_level_num "$LEVEL")
 
-  case "$LOG_LEVEL" in
-    "DEBUG") LOG_LEVEL_NUM=10 ;;
-    "INFO") LOG_LEVEL_NUM=20 ;;
-    "WARNING") LOG_LEVEL_NUM=30 ;;
-    "ERROR") LOG_LEVEL_NUM=40 ;;
-    "CRITICAL") LOG_LEVEL_NUM=50 ;;
-    *) LOG_LEVEL_NUM=20 ;;  # Default to INFO
-  esac
-
+  # Output log message if the message level is >= log level
   if [ "$LEVEL_NUM" -ge "$LOG_LEVEL_NUM" ]; then
     echo "$SCRIPT_NAME - $LEVEL - $MESSAGE"
   fi
 }
 
+# todo watch modified as in python
 monitor_directory() {
     inotifywait -m -r -e close_write --format '%w%f' "$WATCH_DIR" | while read -r NEWFILE; do
-        log "INFO" "New file detected: $NEWFILE"
+        log "DEBUG" "New file detected: $NEWFILE"
+        log "INFO" "Running process script: ['$PROCESS_SCRIPT' '$NEWFILE']"
         "$PROCESS_SCRIPT" "$NEWFILE"
     done
 }
 
 # Check if the filesystem type supports inotify
 check_inotify_support() {
-    # Read file system type
-    FS_TYPE=$(stat -f -c %T "$WATCH_DIR")
     # These file systems do not support inotify
-    if [ "$FS_TYPE" = "v9fs" ] || [ "$FS_TYPE" = "fuseblk" ] || [ "$FS_TYPE" = "nfs" ] || [ "$FS_TYPE" = "cifs" ] || [ "$FS_TYPE" = "smbfs" ]; then
+    if [ "$FS_TYPE" = "9p" ] || [ "$FS_TYPE" = "fuse" ] || [ "$FS_TYPE" = "nfs" ] || [ "$FS_TYPE" = "cifs" ]; then
+        log "DEBUG" "File system '$FS_TYPE' of '$WATCH_DIR' does not support inotifywait. Switching to Python polling."
+        return 1
+    elif [ -z "$FS_TYPE" ]; then
+        log "WARN" "FS_TYPE was $FS_TYPE"
+        log "WARN" "Could not determine file system of '$WATCH_DIR', falling back to Python polling. Full output of df -T \"$WATCH_DIR\" is: $(df -T "$WATCH_DIR" | tr '\n' ' ')"
         return 1
     else
-        return
+        log "DEBUG" "File system '$FS_TYPE' of '$WATCH_DIR' supports inotifywait. Using inotifywait."
     fi
 }
 
@@ -61,10 +67,17 @@ fi
 WATCH_DIR="$1"
 PROCESS_SCRIPT="$2"
 
+
+if [ ! -d "$WATCH_DIR" ]; then
+    log "CRITICAL" "Directory '$WATCH_DIR' does exists."
+    return 1
+fi
+
+# Read file system type
+FS_TYPE="$(df -T "$WATCH_DIR" | awk 'NR==2 {print $2}')"
+
 if check_inotify_support; then
-    log "INFO" "Using inotifywait."
     monitor_directory
 else
-    log "INFO" "Switching to Python polling."
-    exec python3 /path/to/watchpuppy.py "$WATCH_DIR" "$PROCESS_SCRIPT"
+    exec python3 "$SCRIPT_DIR"/watchpuppy.py "$WATCH_DIR" "$PROCESS_SCRIPT"
 fi

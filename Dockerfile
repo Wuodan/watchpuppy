@@ -1,10 +1,26 @@
-FROM python:3-alpine
+# Base image argument
+ARG BASE_IMAGE=python:3-alpine
+
+FROM ${BASE_IMAGE}
 
 # For logging
-ENV LOG_LEVEL=DEBUG
+ENV LOG_LEVEL=INFO
 
 # Install inotify-tools
-RUN apk add --no-cache inotify-tools
+RUN \
+    if command -v apk > /dev/null 2>&1; then \
+        # For Alpine
+        apk add --no-cache inotify-tools coreutils; \
+    elif command -v apt-get > /dev/null 2>&1; then \
+        # For Debian
+        apt-get update && \
+        apt-get install -y --no-install-recommends inotify-tools && \
+        apt-get clean && \
+        rm -rf /var/lib/apt/lists/*; \
+    else \
+        echo "Unsupported package manager. Exiting." && \
+        exit 1; \
+    fi
 
 # Create a non-privileged user that the app will run under.
 ARG UID=10001
@@ -23,25 +39,26 @@ WORKDIR /app
 # Create a virtual environment
 RUN python3 -m venv venv
 # Ensure the virtual environment is used for all future commands
-ENV PATH="$(pwd)/venv/bin:$PATH"
+ENV PATH="/app/venv/bin:$PATH"
 
-# Download dependencies as a separate step to take advantage of Docker's caching.
-# Leverage a cache mount to /home/appuser/pip to speed up subsequent builds.
 # Leverage a bind mount to requirements.txt to avoid having to copy them into
 # into this layer.
-RUN --mount=type=cache,target=/home/appuser/.cache/pip \
-    --mount=type=bind,source=requirements.txt,target=requirements.txt,readonly \
+RUN --mount=type=bind,source=requirements.txt,target=requirements.txt,readonly \
     python3 -m pip install --upgrade pip \
     && python3 -m pip install -r requirements.txt \
-    && rm -rf /tmp/*
+    && rm -rf /tmp/* /home/appuser/.cache/pip
+
+USER root
 
 # Copy scripts late to avoid rebuilds
-USER root
-COPY watchpuppy watchpuppy.py /app/
+COPY watchpuppy watchpuppy.py /app/bin/
+
+# Add watchpuppy to the PATH environment variable
+ENV PATH="/app/bin:${PATH}"
 
 WORKDIR /data
 
 # Use non-priviledged user to run app
 USER appuser
 
-CMD ["/app/watchpuppy", "/data/input", "echo"]
+CMD ["watchpuppy"]
