@@ -5,6 +5,6 @@ services:
     image: wuodan/watchpuppy:latest
     container_name: watchpuppy
     environment:
-      LOG_LEVEL: INFO
+      LOG_LEVEL: DEBUG
     volumes:
       - ./input/:/data/input:ro
