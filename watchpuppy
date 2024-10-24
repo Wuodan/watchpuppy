@@ -45,7 +45,7 @@ check_inotify_support() {
   fs_type="$(stat -f -c %T "$WATCH_DIR")"
 
   # These file systems do not support inotify
-  if [[ "$fs_type" == "v9fs" || "$fs_type" == "fuseblk" || "$fs_type" == "nfs" || "$fs_type" == "cifs" || "$fs_type" == "smbfs" || "$fs_type" == "overlayfs" ]]; then
+  if [[ "$fs_type" == "v9fs" || "$fs_type" == "fuseblk" || "$fs_type" == "nfs" || "$fs_type" == "cifs" || "$fs_type" == "smbfs" ]]; then
       log "DEBUG" "File system $fs_type does not support inotify. Switching to Python polling."
       return 1
   else
