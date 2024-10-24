@@ -16,7 +16,7 @@ log() {
   declare -A LEVELS=( ["DEBUG"]=10 ["INFO"]=20 ["WARNING"]=30 ["ERROR"]=40 ["CRITICAL"]=50 )
 
   if [ "${LEVELS[$LEVEL]}" -ge "${LEVELS[$LOG_LEVEL]}" ]; then
-    echo "$SCRIPT_NAME: [$LEVEL] $MESSAGE"
+    echo "$SCRIPT_NAME - $LEVEL - $MESSAGE"
   fi
 }
 
