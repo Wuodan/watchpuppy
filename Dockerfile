@@ -46,4 +46,4 @@ WORKDIR /data
 # Use non-priviledged user to run app
 USER appuser
 
-CMD ["/app/watchpuppy", "/data/input", "echo"]
+CMD ["/app/watchpuppy.sh", "/data/input", "echo"]

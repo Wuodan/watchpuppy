@@ -12,23 +12,15 @@ set -e
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-# Check if .env file exists and source it
-if [[ -f .env ]]; then
-    echo "Loading environment variables from .env file..."
-    source .env
-else
-    echo ".env file not found, continuing without it..."
-fi
-
-IMG_NAME="${IMG_NAME:-wuodan/watchpuppy:latest}"
-CONTAINER_NAME="${CONTAINER_NAME:-watchpuppy}"
+echo "Loading environment variables from .env file..."
+source .env
 
 docker container rm -f "$CONTAINER_NAME" || true
 
 docker build \
   --rm \
   --file "$SCRIPT_DIR/Dockerfile" \
-  -t $IMG_NAME \
+  -t "$IMG_NAME" \
   "$SCRIPT_DIR"
 
 echo "Docker image: $IMG_NAME"
@@ -37,7 +29,7 @@ echo "Docker image: $IMG_NAME"
 MSYS_NO_PATHCONV=1 docker run -d \
   -v "$SCRIPT_DIR/input/:/data/input:ro" \
   --name "$CONTAINER_NAME" \
-  $IMG_NAME \
+  "$IMG_NAME" \
   tail -f /dev/null
 
 echo "Docker container '$CONTAINER_NAME' running, but your app is not !"
