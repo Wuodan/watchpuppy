@@ -1,5 +1,8 @@
 #!/usr/bin/env sh
 
+# Copyright (c) 2024 Stefan Kuhn
+# Licensed under the MIT License
+
 set -e
 
 SCRIPT_DIR=$(dirname "$0")

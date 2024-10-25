@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# Copyright (c) 2024 Stefan Kuhn
+# Licensed under the MIT License
+
 import time
 import os
 import sys
