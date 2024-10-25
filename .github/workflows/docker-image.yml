@@ -1,0 +1,86 @@
+name: Docker Image CI
+
+on:
+  push:
+    tags:
+      - '*'
+
+env:
+  REPO_NAME: ${{ github.repository }}
+  REPO_TAG: ${{ github.repository }}:${{ github.ref_name }}
+
+jobs:
+
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    # only tags on repo default branch !
+    if: startsWith(github.ref, 'refs/tags/') && github.ref == 'refs/heads/${{ github.default_branch }}'
+
+    strategy:
+      matrix:
+        variant: [ "alpine", "slim", "bookworm" ]
+
+    steps:
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Convert REPO_NAME and REPO_TAG to lowercase for Docker Hub
+        run: |
+          (
+            echo "REPO_NAME=${REPO_NAME,,}"
+            echo "REPO_TAG=${REPO_TAG,,}"
+          ) >> $GITHUB_ENV
+
+      # Full Semantic Version Tags: alpine debian slim
+
+#      - name: Build and push variant
+#        uses: docker/build-push-action@v6
+#        with:
+#          context: .
+#          push: true
+#          build-args: |
+#            BASE_IMAGE=python:${{ matrix.variant }}
+#          tags: |
+#            ${{ env.REPO_TAG }}-${{ matrix.variant }}
+
+      - name: Add docker variant tags only for highest git-tag
+        run: |
+          git fetch --tags
+          HIGHEST_GIT_TAG=$(git tag --sort=-v:refname | head -n 1)
+          
+          echo "HIGHEST_GIT_TAG=$HIGHEST_GIT_TAG"
+          echo "github.ref_name=${GITHUB_REF_NAME}"
+          
+          docker build \
+            -t "${REPO_TAG}-${{ matrix.variant }}" \
+            --build-arg BASE_IMAGE=python:${{ matrix.variant }} \
+            .
+          docker push "${REPO_TAG}-${{ matrix.variant }}"
+          
+          if [[ "$GITHUB_REF_NAME" == "$HIGHEST_GIT_TAG" ]]; then
+            echo "Tagging and pushing short variant as highest git tag..."
+            docker tag \
+              "${REPO_TAG}-${{ matrix.variant }}" \
+              "${REPO_NAME}:${{ matrix.variant }}"
+              docker push "${REPO_NAME}:${{ matrix.variant }}"
+          
+            # Tag only Alpine variant as latest
+            if [[ "${{ matrix.variant }}" == "alpine" ]]; then
+              echo "Tagging and pushing latest Alpine variant as highest git tag..."
+              docker tag "${REPO_TAG}-${{ matrix.variant }}" "${REPO_NAME}:latest"
+              docker push "${REPO_NAME}:latest"
+            fi
+          else
+            echo "Current tag is not the highest. Skipping additional tags."
+          fi
