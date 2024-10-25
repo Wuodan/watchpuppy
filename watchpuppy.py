@@ -14,7 +14,9 @@ from watchdog.events import FileSystemEventHandler
 logger = logging.getLogger(os.path.basename(__file__))
 logger.setLevel(logging.DEBUG)
 
-log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+log_level = os.getenv("WATCHPUPPY_LOG_LEVEL") or os.getenv("LOG_LEVEL", "INFO")
+log_level = log_level.upper()
+
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(log_level)
 console_handler.setFormatter(logging.Formatter('%(name)s - %(levelname)s - %(message)s'))
@@ -47,7 +49,8 @@ class FileHandler(FileSystemEventHandler):
 			logger.debug("Running process script: ['%s' '%s']", self.process_script, filepath)
 			exit_code = os.system(f"{self.process_script} {filepath}")
 			if exit_code != 0:
-				raise Exception(f"Process script ['{self.process_script}' '{filepath}'] returned non-zero exit code: {exit_code}")
+				raise Exception(
+					f"Process script ['{self.process_script}' '{filepath}'] returned non-zero exit code: {exit_code}")
 		except Exception as e:
 			logger.error("Failed to process %s: %s", filepath, e)
 

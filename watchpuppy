@@ -7,7 +7,11 @@ set -e
 
 SCRIPT_DIR=$(dirname "$0")
 SCRIPT_NAME="watchpuppy"
+
+# LOG_LEVEL
+LOG_LEVEL=${WATCHPUPPY_LOG_LEVEL:-$LOG_LEVEL}
 LOG_LEVEL=${LOG_LEVEL:-"INFO"}
+LOG_LEVEL=$(echo "$LOG_LEVEL" | tr '[:lower:]' '[:upper:]')
 
 # Function to map log level names to numeric values
 get_log_level_num() {
