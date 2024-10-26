@@ -1,0 +1,60 @@
+services:
+  watchpuppy:
+    build:
+      context: ..
+    image: wuodan/watchpuppy:${WATCHPUPPY_TAG:-alpine}
+    container_name: watchpuppy
+    command: [
+      "watchpuppy",
+      # call SUCCESS scripts
+      "-i", "insert-action.sh",
+      "-d", "delete-action.sh",
+      "/data/input"
+    ]
+    environment:
+      WATCHPUPPY_LOG_LEVEL: WARN
+    volumes:
+      - ../input/:/data/input:ro
+      # map SUCCESS scripts
+      - ./action-script.sh:/app/bin/insert-action.sh:ro
+      - ./action-script.sh:/app/bin/delete-action.sh:ro
+  watchpuppy-error:
+    build:
+      context: ..
+    image: wuodan/watchpuppy:${WATCHPUPPY_TAG:-alpine}
+    container_name: watchpuppy-error
+    command: [
+      "watchpuppy",
+      # call ERROR scripts
+      "--insert", "insert-error.sh",
+      "--delete", "delete-error.sh",
+      "/data/input"
+    ]
+    environment:
+      WATCHPUPPY_LOG_LEVEL: DEBUG
+    volumes:
+      - ../input/:/data/input:ro
+      # map ERROR scripts
+      - ./error-script.sh:/app/bin/insert-error.sh:ro
+      - ./error-script.sh:/app/bin/delete-error.sh:ro
+  watchpuppy-demo:
+    build:
+      context: ..
+    image: wuodan/watchpuppy:${WATCHPUPPY_TAG:-alpine}
+    container_name: watchpuppy-demo
+    environment:
+      LOG_LEVEL: DEBUG
+    volumes:
+      - ../input/:/data/input
+      # map SUCCESS scripts
+      - ./action-script.sh:/app/bin/insert-action.sh:ro
+      - ./action-script.sh:/app/bin/delete-action.sh:ro
+      # map ERROR scripts
+      - ./error-script.sh:/app/bin/insert-error.sh:ro
+      - ./error-script.sh:/app/bin/delete-error.sh:ro
+      # map run-tests scripts
+      - ./run-tests.sh:/app/bin/run-tests.sh:ro
+    depends_on:
+      - watchpuppy
+      - watchpuppy-error
+    command: [ "run-tests.sh" ]

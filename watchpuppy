@@ -8,12 +8,15 @@ set -e
 SCRIPT_DIR=$(dirname "$0")
 SCRIPT_NAME="watchpuppy"
 
-# LOG_LEVEL
+# LOG_LEVEL setup
 LOG_LEVEL=${WATCHPUPPY_LOG_LEVEL:-$LOG_LEVEL}
 LOG_LEVEL=${LOG_LEVEL:-"INFO"}
 LOG_LEVEL=$(echo "$LOG_LEVEL" | tr '[:lower:]' '[:upper:]')
 
-# Function to map log level names to numeric values
+tty -s
+HAS_TTY=$?
+
+# Convert log level names to numeric values for filtering
 get_log_level_num() {
   case "$1" in
     "DEBUG") echo 10 ;;
@@ -25,66 +28,185 @@ get_log_level_num() {
   esac
 }
 
-# Set the log level number only once
+# Set the log level number once
 LOG_LEVEL_NUM=$(get_log_level_num "$LOG_LEVEL")
 
 log() {
   LEVEL=$1
   MESSAGE=$2
-
-  # Get numeric value for the current log level
-  LEVEL_NUM=$(get_log_level_num "$LEVEL")
-
-  # Output log message if the message level is >= log level
-  if [ "$LEVEL_NUM" -ge "$LOG_LEVEL_NUM" ]; then
-    echo "$SCRIPT_NAME - $LEVEL - $MESSAGE"
+  # Output MESSAGE if LEVEL is at or above LOG_LEVEL
+  if [ "$(get_log_level_num "$LEVEL")" -ge "$LOG_LEVEL_NUM" ]; then
+      if [ "$HAS_TTY" -eq 0 ]; then
+          FULL_MESSAGE="$MESSAGE"
+      else
+          # log inside docker container
+          FULL_MESSAGE="$SCRIPT_NAME - $LEVEL - $MESSAGE"
+      fi
+      # WARN or above to STDERR
+      if [ "$(get_log_level_num "$LEVEL")" -ge 30 ]; then
+          echo "$FULL_MESSAGE" >&2
+      else
+          echo "$FULL_MESSAGE"
+      fi
   fi
 }
 
-# todo watch modified as in python
+# Run the specified action with sync or async mode
+run_action() {
+    ACTION="$1"
+    FILE="$2"
+    if [ "$SYNC_MODE" = true ]; then
+        "$ACTION" "$FILE"
+    else
+        "$ACTION" "$FILE" &
+    fi
+}
+
+# Handle each file event based on its type
+handle_event() {
+    EVENT="$1"
+    FILE="$2"
+
+    case "$EVENT" in
+        CLOSE_WRITE,CLOSE|MOVED_TO)
+            if [ -n "$INSERT_ACTION" ]; then
+                log "INFO" "Running insert action: ['$INSERT_ACTION' '$FILE']"
+                run_action "$INSERT_ACTION" "$FILE"
+            fi
+            ;;
+        DELETE|DELETE_SELF|MOVED_FROM)
+            if [ -n "$DELETE_ACTION" ]; then
+                log "INFO" "Running delete action: ['$DELETE_ACTION' '$FILE']"
+                run_action "$DELETE_ACTION" "$FILE"
+            fi
+            ;;
+        *)
+            log "WARN" "Unhandled event type: $EVENT"
+            ;;
+    esac
+}
+
+# Monitor directory for changes
 monitor_directory() {
-    inotifywait -m -r -e close_write --format '%w%f' "$WATCH_DIR" | while read -r NEWFILE; do
-        log "DEBUG" "New file detected: $NEWFILE"
-        log "INFO" "Running process script: ['$PROCESS_SCRIPT' '$NEWFILE']"
-        "$PROCESS_SCRIPT" "$NEWFILE"
+    inotifywait -m -r -e close_write -e delete -e moved_from -e moved_to --format '%w%f %e' "$WATCH_DIR" | while read -r FILE EVENT; do
+        log "DEBUG" "Event detected: $EVENT on file: $FILE"
+        handle_event "$EVENT" "$FILE"
     done
 }
 
 # Check if the filesystem type supports inotify
 check_inotify_support() {
-    # These file systems do not support inotify
-    if [ "$FS_TYPE" = "9p" ] || [ "$FS_TYPE" = "fuse" ] || [ "$FS_TYPE" = "nfs" ] || [ "$FS_TYPE" = "cifs" ]; then
-        log "DEBUG" "File system '$FS_TYPE' of '$WATCH_DIR' does not support inotifywait. Switching to Python polling."
-        return 1
-    elif [ -z "$FS_TYPE" ]; then
-        log "WARN" "FS_TYPE was $FS_TYPE"
-        log "WARN" "Could not determine file system of '$WATCH_DIR', falling back to Python polling. Full output of df -T \"$WATCH_DIR\" is: $(df -T "$WATCH_DIR" | tr '\n' ' ')"
-        return 1
-    else
-        log "DEBUG" "File system '$FS_TYPE' of '$WATCH_DIR' supports inotifywait. Using inotifywait."
-    fi
+    case "$FS_TYPE" in
+        "9p"|"fuse"|"nfs"|"cifs")
+            log "DEBUG" "File system '$FS_TYPE' of '$WATCH_DIR' does not support inotifywait. Switching to Python polling."
+            return 1
+            ;;
+        "")
+            log "WARN" "Could not determine file system of '$WATCH_DIR', falling back to Python polling."
+            return 1
+            ;;
+        *)
+            log "DEBUG" "File system '$FS_TYPE' supports inotifywait."
+            return 0
+            ;;
+    esac
 }
 
-# Check if exactly two arguments are provided
-if [ $# -ne 2 ]; then
-    log "ERROR" "Usage: $0 /path/to/directory /path/to/process-script"
+# Initialize variables to track whether any action is provided
+INSERT_ACTION=""
+DELETE_ACTION=""
+WATCH_DIR=""
+SYNC_MODE=false
+
+# Function to display usage
+show_usage() {
+    log "CRITICAL" "Usage: $0 [-i|--insert-action <INSERT_ACTION>] [-d|--delete-action <DELETE_ACTION>] [--sync] <directory_path>"
+    log "CRITICAL" "At least one of -i or -d must be specified."
+    exit 1
+}
+
+# Check if no options are provided
+if [ "$#" -eq 0 ]; then
+    show_usage
+fi
+
+# debug dump arguments
+log "DEBUG" "Received these arguments: $*"
+
+# Read file system type of last argument, the WATCH_DIR
+for WATCH_DIR; do true; done
+FS_TYPE=$(df -T "$WATCH_DIR" | awk 'NR==2 {print $2}')
+
+# Check inotify support, replace current process with Python process
+if ! check_inotify_support; then
+    # switch to Python and pass all arguments
+    exec "$SCRIPT_DIR"/watchpuppy.py "$@"
+fi
+unset WATCH_DIR
+
+# Parse options
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -i|--insert-action)
+            if [ -n "$INSERT_ACTION" ]; then
+                log "CRITICAL" "-i|--insert-action specified multiple times."
+                exit 1
+            elif [ -n "$2" ]; then
+                INSERT_ACTION="$2"
+                shift 2
+            else
+                log "CRITICAL" "-i|--insert-action requires a value."
+                show_usage
+            fi
+            ;;
+        -d|--delete-action)
+            if [ -n "$DELETE_ACTION" ]; then
+                log "CRITICAL" "-i|--delete-action specified multiple times."
+                exit 1
+            elif [ -n "$2" ]; then
+                DELETE_ACTION="$2"
+                shift 2
+            else
+                log "CRITICAL" "-d|--delete-action requires a value."
+                show_usage
+            fi
+            ;;
+        --sync)
+            SYNC_MODE=true
+            shift
+            ;;
+        *)
+            if [ -z "$WATCH_DIR" ]; then
+                WATCH_DIR="$1"
+                shift
+            else
+                log "CRITICAL" "Unexpected parameter '$1'."
+                show_usage
+            fi
+            ;;
+    esac
+done
+
+# Check if directory path is provided
+if [ -z "$WATCH_DIR" ]; then
+    log "CRITICAL" "Directory path is required."
+    show_usage
+elif [ ! -d "$WATCH_DIR" ]; then
+    log "CRITICAL" "Directory '$WATCH_DIR' does not exist."
+    exit 1
+# Check if at least one action is provided
+elif [ -z "$INSERT_ACTION" ] && [ -z "$DELETE_ACTION" ]; then
+    log "CRITICAL" "At least one of -i or -d must be provided."
+    show_usage
+# Check if INSERT_ACTION is executable
+elif [ -n "$INSERT_ACTION" ] && ! command -v "$INSERT_ACTION" >/dev/null; then
+    log "CRITICAL" "$INSERT_ACTION not found or not executable"
+    exit 1
+# Check if DELETE_ACTION is executable
+elif [ -n "$DELETE_ACTION" ] && ! command -v "$DELETE_ACTION" >/dev/null; then
+    log "CRITICAL" "$DELETE_ACTION not found or not executable"
     exit 1
 fi
 
-WATCH_DIR="$1"
-PROCESS_SCRIPT="$2"
-
-
-if [ ! -d "$WATCH_DIR" ]; then
-    log "CRITICAL" "Directory '$WATCH_DIR' does exists."
-    return 1
-fi
-
-# Read file system type
-FS_TYPE="$(df -T "$WATCH_DIR" | awk 'NR==2 {print $2}')"
-
-if check_inotify_support; then
-    monitor_directory
-else
-    exec python3 "$SCRIPT_DIR"/watchpuppy.py "$WATCH_DIR" "$PROCESS_SCRIPT"
-fi
+# start monitoring
+monitor_directory

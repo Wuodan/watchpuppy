@@ -1,0 +1,17 @@
+# run from project root with:
+# docker-compose -f sample/docker-compose-better-output.yml up -d
+services:
+  watchpuppy:
+    image: wuodan/watchpuppy
+    volumes:
+      - ../input/:/data/input:ro
+      - ../sample/action-script.sh:/app/bin/insert-action.sh:ro
+      - ../sample/action-script.sh:/app/bin/delete-action.sh:ro
+    environment:
+      WATCHPUPPY_LOG_LEVEL: DEBUG
+    command: [
+      "watchpuppy",
+      "-i", "insert-action.sh",
+      "-d", "delete-action.sh",
+      "/data/input"
+    ]
