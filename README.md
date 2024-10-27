@@ -7,17 +7,16 @@ Watchpuppy
 
 ### Problem
 
-In Docker environments the file systems of mounted from Windows hosts or network file systems do not support
-the Linux native real-time event-driven file monitoring.
+Docker environments using mounted file systems from Windows hosts or network file systems lack support for Linux's native, real-time event-driven file monitoring.
 
 ### Solution
 
-Watchpuppy uses [inotifywait](https://github.com/inotify-tools/inotify-tools/wiki#inotifywait) if supported and
-switches to polling with [Watchdog](https://github.com/gorakhargosh/watchdog) as fallback.
+Watchpuppy leverages [inotifywait](https://github.com/inotify-tools/inotify-tools/wiki#inotifywait) when supported and falls back to polling with [Watchdog](https://github.com/gorakhargosh/watchdog) as needed.
 
-This provides a seamless solution, even if the Docker volume's file system type is unknown.
+This approach ensures seamless file monitoring, even when the Docker volume's file system type is unknown.
 
-Just add one script and be ready!
+Just add one script, and you're set!
+
 
 ## Installation
 
@@ -104,7 +103,7 @@ This simple but powerful setup allows a receiving instance to react to all chang
 File event actions are executed for a file event as in:
 
 ```shell
-my-script.sh "&lt;file-path&gt;"
+my-script.sh "<file-path>"
 ```
 
 Both `insert-action` and `delete-action` are optional, but at least one must be provided.
