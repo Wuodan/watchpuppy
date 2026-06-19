@@ -33,7 +33,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Check out the repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Convert REPO_NAME and REPO_TAG to lowercase for Docker Hub
         run: |
